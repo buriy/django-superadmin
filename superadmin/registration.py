@@ -9,52 +9,18 @@ from django.utils.importlib import import_module # django 1.2 feature
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _
 from django.utils.encoding import force_unicode
-import admin_auth #@UnusedImport
 
-def render_add_link(site, opts, name):
-    info = (opts.app_label, opts.object_name.lower())
-    try:
-        related_url = reverse('admin:%s_%s_add' % info, current_app=site.name)
-    except NoReverseMatch:
-        info = (site.root_path, opts.app_label, opts.object_name.lower())
-        related_url = '%s%s/%s/add/' % info
-    # TODO: "id_" is hard-coded here. This should instead use the correct
-    # API to determine the ID dynamically.
-    output = []
-    output.append(u'<a href="%s" class="add-another" id="add_id_%s" onclick="return showAddAnotherPopup(this);"> ' % \
-        (related_url, name))
-    output.append(u'<img src="%simg/admin/icon_addlink.gif" width="10" height="10" alt="%s"/></a>' % (settings.ADMIN_MEDIA_PREFIX, _('Add Another')))
-    return output
+def patch_admin_auth():
+    import patches.auth #@UnusedImport
 
-def render_edit_link(site, opts, name, value):
-    info = (opts.app_label, opts.object_name.lower())
-    try:
-        related_url = reverse('admin:%s_%s_change' % info, args=(value,), current_app=site.name)
-    except NoReverseMatch:
-        info = (site.root_path, opts.app_label, opts.object_name.lower(), value)
-        related_url = '%s%s/%s/%s/' % info
-    # TODO: "id_" is hard-coded here. This should instead use the correct
-    # API to determine the ID dynamically.
-    output = []
-    output.append(u'<a href="%s" class="edit-it" id="edit_id_%s"> ' % \
-        (related_url, name))
-    output.append(u'<img src="%simg/admin/icon_changelink.gif" width="10" height="10" alt="%s"/></a>' % (settings.ADMIN_MEDIA_PREFIX, _('Edit object')))
-    return output
+def patch_autosuperuser():
+    import patches.syncdb #@UnusedImport
 
-def new_render(self, name, value, *args, **kwargs):
-    rel_to = self.rel.to
-    self.widget.choices = self.choices
-    output = [self.widget.render(name, value, *args, **kwargs)]
+def patch_editrelated():
+    import patches.editrelated #@UnusedImport
 
-    if rel_to in self.admin_site._registry: # If the related object has an admin interface:
-        output.extend(render_add_link(self.admin_site, rel_to._meta, name))
-        if value and not isinstance(value, list):
-            output.extend(render_edit_link(self.admin_site, rel_to._meta, name, value))
-    
-    return mark_safe(u''.join(output))
-
-original_render = RelatedFieldWidgetWrapper.render
-RelatedFieldWidgetWrapper.render = new_render
+def patch_everything():
+    from patches import auth, syncdb, editrelated
 
 def get_admin_object_url(instance):
     """
@@ -89,9 +55,10 @@ def get_unicode(self):
     except:
         return '[%s]' % self.pk
     
-def shortener(name):
-    name = force_unicode(name)[:50]
-    if len(name)>47: return name[:47]+'...'
+def shortener(name, length=50):
+    name = force_unicode(name)[:length]
+    if len(name) > length-3:
+        return name[:length-3]+'...'
     return name
 
 def reg_simple(model, klass=ModelAdmin, exclude=None, include=[], list_display=None, shorten=[], site=site, **options):
@@ -101,9 +68,13 @@ def reg_simple(model, klass=ModelAdmin, exclude=None, include=[], list_display=N
         list_display = fields_to_display(model, exclude) + include
     else:
         list_display = [x for x in list_display if not x in exclude] + include
-    short = lambda x: lambda self: shortener(getattr(self, x))
-    list_display = [(x in shorten) and short(x) or x for x in list_display]
-    print list_display
+    for pos, name in enumerate(list_display):
+        if name in shorten:
+            def shorten_wrapper(self):
+                return shortener(getattr(self, name))
+            shorten_wrapper.admin_order_field = name
+            shorten_wrapper.short_description = name
+            list_display[pos] = shorten_wrapper 
     site.register(model, klass, list_display=list_display, **options)
 
 def reg_editable(model, list_display=None, list_editable=None, exclude=None, **options):
