@@ -1,14 +1,8 @@
 from django.conf import settings
-from django.contrib.admin import site
-from django.contrib.admin.options import ModelAdmin
-from django.contrib.admin.options import TabularInline
-from django.contrib.admin.util import quote
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
 from django.core.urlresolvers import reverse, NoReverseMatch
-from django.utils.importlib import import_module # django 1.2 feature
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _
-from django.utils.encoding import force_unicode
 
 def render_add_link(site, opts, name):
     info = (opts.app_label, opts.object_name.lower())

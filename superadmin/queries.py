@@ -68,12 +68,12 @@ def as_index(qs, keys, values):
     [M1<a=1,b=2,c=3>, M2<a=3,b=4,c=5>], 'c', ('a', 'b') -> {(1,2):3, (3,4):5}
     [M1<a=1,b=2,c=3>, M2<a=3,b=4,c=5>], ('a', 'b'), 'c'  -> {3:(1,2), 5:(3,4)}
     """
-    get_keys, get_values = _make_lambda(get_keys), _make_lambda(get_values, reverse=True)
-    return dict([(get_keys(x), get_values(x)) for x in qs.values_list(*col_key+col_value)])
+    get_keys, get_values = _make_lambda(keys), _make_lambda(values, reverse=True)
+    return dict([(get_keys(x), get_values(x)) for x in qs.values_list(*keys+values)])
 
 def as_tuplemap(qs, keys):
     """[M1<a=1,b=2>, M2<a=3,b=4>], ('a', 'b') -> {(1,2):M1, (3,4):M2}"""
-    return dict(((tuple([d.get(k) for k in x.__dict__]), keys), x) for x in qs)
+    return dict(((tuple([qs.get(k) for k in x.__dict__]), keys), x) for x in qs)
 
 ### ValueQuerySet utility functions
 def as_map_tuples(vqs, key, cols):
@@ -90,4 +90,3 @@ def as_tuples_iter(vqs, cols):
     Row = namedtuple('Row', cols)
     for row in vqs:
         yield Row(*[row[key] for key in cols])
-

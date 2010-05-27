@@ -1,6 +1,12 @@
 from queries import qs_filter
-from lang.strings import force_quote, quote
 import csv
+
+def seq_uniq(S):
+    r = []
+    for item in S:
+        if not item in r:
+            r.append(item)
+    return r
 
 class SkipLine: pass
 class SkipFile: pass
@@ -36,6 +42,17 @@ def parse_number(s):
         return int(s)
     except ValueError:
         return float(s)
+
+def force_quote(s):
+    if '"' in s: # escape all '"' into '\"'
+        s = s.replace('"', '\\"')
+    return '"%s"' % s
+
+def quote(s, chars = ' ,"'):
+    for c in chars:
+        if c in s:
+            return force_quote(s)
+    return s
 
 def export_csv(stream, morqs, strings, dates={}, overrides={}):
     w = csv.writer(stream)
