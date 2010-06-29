@@ -3,6 +3,11 @@ from django.contrib.admin.options import ModelAdmin
 from django.contrib.admin.options import TabularInline
 from django.utils.importlib import import_module # django 1.2 feature
 from django.utils.encoding import force_unicode
+from superadmin.patches import patch_admin_auth
+import types
+import re
+
+patch_admin_auth()
 
 def fields_to_display(model, exclude=None, func=lambda x:True):
     if exclude is None:
@@ -14,8 +19,8 @@ def fields_for_edit(model, exclude=None):
 
 def shortener(name, length=50):
     name = force_unicode(name)[:length]
-    if len(name) > length-3:
-        return name[:length-3]+'...'
+    if len(name) > length - 3:
+        return name[:length - 3] + '...'
     return name
 
 def name_unicode(self):
@@ -24,7 +29,16 @@ def name_unicode(self):
         return '[%s] %s' % (self.pk, name)
     except:
         return '[%s]' % self.pk
-    
+
+def make_wrapper(name):
+    def shorten_wrapper(self):
+        #print type(self), self, name
+        return shortener(getattr(self, name))
+    shorten_wrapper.boolean = False
+    shorten_wrapper.admin_order_field = name
+    shorten_wrapper.short_description = name
+    return shorten_wrapper
+
 def reg_simple(model, klass=ModelAdmin, exclude=None, include=[], list_display=None, shorten=[], site=site, **options):
     pk_name = model._meta.pk.attname
     if exclude is None:
@@ -35,11 +49,7 @@ def reg_simple(model, klass=ModelAdmin, exclude=None, include=[], list_display=N
         list_display = [x for x in list_display if not x in exclude] + include
     for pos, name in enumerate(list_display):
         if name in shorten:
-            def shorten_wrapper(self):
-                return shortener(getattr(self, name))
-            shorten_wrapper.admin_order_field = name
-            shorten_wrapper.short_description = name
-            list_display[pos] = shorten_wrapper
+            list_display[pos] = make_wrapper(name)
     if not hasattr(model, '__unicode__'):
         model.__unicode__ = name_unicode
     if options.get('search_fields') is None and 'name' in list_display:
@@ -65,11 +75,11 @@ def reg_inline(parent, model, klass=TabularInline, exclude=[], include=[], **opt
         try:
             import re
             path = re.sub('\.models$', '', parent.__module__)
-            import_module(path+'.admin')
+            import_module(path + '.admin')
         except:
             raise
             # ImportError("Can't import parent admin"), None, sys.exc_info()[2]
-    
+
     parent_admin = site._registry[parent]
     options['__module__'] = __name__
     options['model'] = model
@@ -87,11 +97,18 @@ def reg_inline(parent, model, klass=TabularInline, exclude=[], include=[], **opt
         parent_admin.inline_instances = []
     parent_admin.inline_instances.append(inline(parent, site))
 
-def reg_all(module, excludes=[], **opts):
+def reg_all(module, app_label=None, excludes=[], **opts):
+    if isinstance(module, types.StringTypes):
+        module = import_module(module)
+        app_label = re.sub('\.models$', '', module.__name__)
     from django.db.models.base import ModelBase, Model
     for name in dir(module):
-        if name in excludes: continue
+        if name in excludes: 
+            continue
         model = getattr(module, name)
-        if model in excludes: continue
+        if model in excludes: 
+            continue
         if type(model) is ModelBase and issubclass(model, Model) and hasattr(model, '_meta'):
+            if app_label and model._meta.app_label != app_label:
+                continue
             reg_editable(model, **opts)
