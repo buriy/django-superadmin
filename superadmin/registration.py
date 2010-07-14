@@ -1,11 +1,10 @@
 from django.contrib.admin import site
-from django.contrib.admin.options import ModelAdmin
-from django.contrib.admin.options import TabularInline
-from django.utils.importlib import import_module # django 1.2 feature
+from django.contrib.admin.options import ModelAdmin, TabularInline
 from django.utils.encoding import force_unicode
+from django.utils.importlib import import_module # django 1.2 feature
 from superadmin.patches import patch_admin_auth
-import types
 import re
+import types
 
 patch_admin_auth()
 
@@ -73,7 +72,6 @@ def reg_editable(model, list_display=None, list_editable=None, exclude=None, **o
 def reg_inline(parent, model, klass=TabularInline, exclude=[], include=[], **options):
     if parent.__module__ != model.__module__:
         try:
-            import re
             path = re.sub('\.models$', '', parent.__module__)
             import_module(path + '.admin')
         except:
@@ -112,3 +110,22 @@ def reg_all(module, app_label=None, excludes=[], **opts):
             if app_label and model._meta.app_label != app_label:
                 continue
             reg_editable(model, **opts)
+
+class SuperAdmin(object):
+    site = site.root
+    model = None
+    klass = ModelAdmin
+    list_exclude = None
+    list_include = []
+    list_display = None
+    list_shorten = []
+    site = site
+
+    @classmethod
+    def register_at(cls, site):
+        model = cls.model
+        exclude = cls.list_exclude
+        include = cls.list_include
+        list_display = cls.list_display
+        shorten = cls.list_shorten
+        reg_simple(model, cls.klass, exclude, include, list_display, shorten, site)
