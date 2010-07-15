@@ -119,13 +119,16 @@ class SuperAdmin(object):
     list_include = []
     list_display = None
     list_shorten = []
-    site = site
 
     @classmethod
-    def register_at(cls, site):
+    def register_at(cls, site, **options):
         model = cls.model
         exclude = cls.list_exclude
         include = cls.list_include
         list_display = cls.list_display
         shorten = cls.list_shorten
-        reg_simple(model, cls.klass, exclude, include, list_display, shorten, site)
+        options = dict(cls.__dict__)
+        for o in ['list_include', 'list_exclude', 'model', 'klass', 'site', 'shorten', 'list_display']:
+            if o in options: 
+                del options[o]
+        reg_simple(model, cls.klass, exclude, include, list_display, shorten, site, **options)
