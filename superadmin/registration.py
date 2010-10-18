@@ -95,7 +95,19 @@ def reg_inline(parent, model, klass=TabularInline, exclude=[], include=[], **opt
         parent_admin.inline_instances = []
     parent_admin.inline_instances.append(inline(parent, site))
 
-def reg_all(module, app_label=None, excludes=[], **opts):
+def reg_app(app_label, excludes=[], editable=True, **opts):
+    from django.db.models.loading import get_app, get_models
+    models = get_models(get_app(app_label))
+    for model in models:
+        name = model.name
+        if name in excludes or model in excludes: 
+            continue
+        if editable:
+            reg_editable(model, **opts)
+        else:
+            reg_simple(model, **opts)
+
+def reg_all(module, app_label=None, editable=True, excludes=[], **opts):
     if isinstance(module, types.StringTypes):
         module = import_module(module)
         app_label = re.sub('\.models$', '', module.__name__)
@@ -109,7 +121,12 @@ def reg_all(module, app_label=None, excludes=[], **opts):
         if type(model) is ModelBase and issubclass(model, Model) and hasattr(model, '_meta'):
             if app_label and model._meta.app_label != app_label:
                 continue
-            reg_editable(model, **opts)
+            if getattr(model._meta, 'abstract'):
+                continue
+            if editable:
+                reg_editable(model, **opts)
+            else:
+                reg_simple(model, **opts)
 
 class SuperAdmin(object):
     site = site.root
