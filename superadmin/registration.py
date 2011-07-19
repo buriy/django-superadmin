@@ -129,7 +129,6 @@ def reg_all(module, app_label=None, editable=True, excludes=[], **opts):
                 reg_simple(model, **opts)
 
 class SuperAdmin(object):
-    site = site.root
     model = None
     klass = ModelAdmin
     list_exclude = None
